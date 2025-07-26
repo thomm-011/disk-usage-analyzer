@@ -146,11 +146,9 @@ Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICE
 - [Plotly](https://plotly.com/) - Gráficos interativos
 - [Tailwind CSS](https://tailwindcss.com/) - Estilização moderna
 
-## 📞 Suporte
+## 👨‍💻 Autor
 
-- 🐛 **Issues:** [GitHub Issues](https://github.com/seu-usuario/disk-usage-analyzer/issues)
-- 📧 **Email:** seu-email@exemplo.com
-- 💬 **Discussões:** [GitHub Discussions](https://github.com/seu-usuario/disk-usage-analyzer/discussions)
+**Thomas** - [GitHub](https://github.com/thomm-011)
 
 ---
 
