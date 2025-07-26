@@ -1,0 +1,67 @@
+# Disk Usage Analyzer - Configuração
+# Arquivo de configuração padrão
+
+# Configurações gerais
+general:
+  default_path: "/home"
+  min_size_threshold: "1KB"
+  max_depth: 10
+  include_hidden: false
+
+# Padrões para excluir
+exclude_patterns:
+  - "*.tmp"
+  - "*.log"
+  - "*.cache"
+  - ".git"
+  - ".svn"
+  - "__pycache__"
+  - "*.pyc"
+  - "*.pyo"
+  - ".DS_Store"
+  - "Thumbs.db"
+  - "node_modules"
+  - ".npm"
+  - ".yarn"
+  - "venv"
+  - ".venv"
+  - "env"
+  - ".env"
+
+# Configurações da interface CLI
+cli:
+  tree_items: 20
+  show_colors: true
+  progress_bar: true
+  
+# Configurações da interface web
+web:
+  host: "127.0.0.1"
+  port: 8080
+  debug: false
+  cache_timeout: 300  # 5 minutos
+
+# Configurações de exportação
+export:
+  default_format: "json"
+  include_metadata: true
+  compress_output: false
+
+# Configurações de análise avançada
+analysis:
+  calculate_hashes: false
+  detect_duplicates: false
+  large_file_threshold: "100MB"
+  
+# Configurações de performance
+performance:
+  max_workers: 4
+  chunk_size: 1000
+  memory_limit: "1GB"
+
+# Configurações de logging
+logging:
+  level: "INFO"
+  file: "disk_analyzer.log"
+  max_size: "10MB"
+  backup_count: 3

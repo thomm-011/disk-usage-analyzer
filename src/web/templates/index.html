@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>💾 Disk Usage Analyzer</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .loading {
+            display: none;
+        }
+        .loading.active {
+            display: block;
+        }
+        .chart-container {
+            min-height: 400px;
+        }
+        .tree-item {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .tree-item:hover {
+            background-color: #f3f4f6;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-blue-600 text-white shadow-lg">
+        <div class="container mx-auto px-4 py-6">
+            <h1 class="text-3xl font-bold flex items-center">
+                <i class="fas fa-hdd mr-3"></i>
+                Disk Usage Analyzer
+            </h1>
+            <p class="text-blue-100 mt-2">Análise detalhada do uso de disco em sistemas Linux</p>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        <!-- Analysis Form -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4 flex items-center">
+                <i class="fas fa-cog mr-2 text-blue-600"></i>
+                Configurações de Análise
+            </h2>
+            
+            <form id="analysisForm" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-folder mr-1"></i>
+                        Diretório
+                    </label>
+                    <input type="text" id="pathInput" value="/home" 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-weight-hanging mr-1"></i>
+                        Tamanho Mínimo
+                    </label>
+                    <div class="flex">
+                        <input type="number" id="minSizeNumber" value="1" min="0" step="0.1"
+                               class="flex-1 px-3 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <select id="minSizeUnit" 
+                                class="px-3 py-2 border border-gray-300 border-l-0 rounded-r-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                            <option value="B">B</option>
+                            <option value="KB" selected>KB</option>
+                            <option value="MB">MB</option>
+                            <option value="GB">GB</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-layer-group mr-1"></i>
+                        Profundidade Máxima
+                    </label>
+                    <input type="number" id="maxDepthInput" value="5" min="1" max="20"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                
+                <div class="flex items-end">
+                    <button type="submit" id="analyzeBtn" 
+                            class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center">
+                        <i class="fas fa-search mr-2"></i>
+                        Analisar
+                    </button>
+                </div>
+            </form>
+            
+            <div class="mt-4">
+                <label class="flex items-center">
+                    <input type="checkbox" id="includeHiddenInput" class="mr-2">
+                    <span class="text-sm text-gray-700">Incluir arquivos ocultos</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loadingIndicator" class="loading text-center py-8">
+            <div class="inline-flex items-center">
+                <i class="fas fa-spinner fa-spin text-2xl text-blue-600 mr-3"></i>
+                <span class="text-lg text-gray-600">Analisando diretórios...</span>
+            </div>
+        </div>
+
+        <!-- Results Container -->
+        <div id="resultsContainer" style="display: none;">
+            <!-- Summary Cards -->
+            <div id="summaryCards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <!-- Cards will be populated by JavaScript -->
+            </div>
+
+            <!-- Charts Row -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                <!-- Pie Chart -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center">
+                        <i class="fas fa-chart-pie mr-2 text-green-600"></i>
+                        Distribuição por Diretório
+                    </h3>
+                    <div id="pieChart" class="chart-container"></div>
+                </div>
+
+                <!-- Treemap -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center">
+                        <i class="fas fa-th mr-2 text-purple-600"></i>
+                        Mapa de Árvore
+                    </h3>
+                    <div id="treemapChart" class="chart-container"></div>
+                </div>
+            </div>
+
+            <!-- Directory Tree and Large Files -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                <!-- Directory Tree -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center">
+                        <i class="fas fa-sitemap mr-2 text-blue-600"></i>
+                        Estrutura de Diretórios
+                    </h3>
+                    <div id="directoryTree" class="max-h-96 overflow-y-auto"></div>
+                </div>
+
+                <!-- Large Files -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center">
+                        <i class="fas fa-file-alt mr-2 text-red-600"></i>
+                        Arquivos Grandes
+                    </h3>
+                    <div id="largeFilesList" class="max-h-96 overflow-y-auto"></div>
+                </div>
+            </div>
+
+            <!-- File Types Table -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold mb-4 flex items-center">
+                    <i class="fas fa-list mr-2 text-yellow-600"></i>
+                    Tipos de Arquivo
+                </h3>
+                <div id="fileTypesTable" class="overflow-x-auto"></div>
+            </div>
+        </div>
+
+        <!-- Error Display -->
+        <div id="errorContainer" style="display: none;" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-8">
+            <h3 class="text-lg font-semibold text-red-800 mb-2 flex items-center">
+                <i class="fas fa-exclamation-triangle mr-2"></i>
+                Erro na Análise
+            </h3>
+            <p id="errorMessage" class="text-red-700"></p>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-6 mt-12">
+        <div class="container mx-auto px-4 text-center">
+            <p>&copy; 2024 Disk Usage Analyzer - Ferramenta de análise de disco para Linux</p>
+        </div>
+    </footer>
+
+    <script>
+        // Global variables
+        let currentAnalysis = null;
+
+        // Form submission
+        document.getElementById('analysisForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            analyzeDirectory();
+        });
+
+        async function analyzeDirectory() {
+            const path = document.getElementById('pathInput').value;
+            const minSizeNumber = document.getElementById('minSizeNumber').value;
+            const minSizeUnit = document.getElementById('minSizeUnit').value;
+            const minSize = minSizeNumber + minSizeUnit;
+            const maxDepth = document.getElementById('maxDepthInput').value;
+            const includeHidden = document.getElementById('includeHiddenInput').checked;
+
+            // Show loading
+            document.getElementById('loadingIndicator').classList.add('active');
+            document.getElementById('resultsContainer').style.display = 'none';
+            document.getElementById('errorContainer').style.display = 'none';
+            document.getElementById('analyzeBtn').disabled = true;
+
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        path: path,
+                        min_size: minSize,
+                        max_depth: parseInt(maxDepth),
+                        include_hidden: includeHidden
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Erro na análise');
+                }
+
+                currentAnalysis = data;
+                displayResults(data);
+
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                document.getElementById('loadingIndicator').classList.remove('active');
+                document.getElementById('analyzeBtn').disabled = false;
+            }
+        }
+
+        function displayResults(data) {
+            // Show results container
+            document.getElementById('resultsContainer').style.display = 'block';
+
+            // Display summary cards
+            displaySummaryCards(data.summary);
+
+            // Display charts
+            if (data.pie_chart && data.pie_chart.labels) {
+                displayPieChart(data.pie_chart);
+            }
+
+            if (data.treemap_data && data.treemap_data.labels) {
+                displayTreemap(data.treemap_data);
+            }
+
+            // Display directory tree
+            displayDirectoryTree(data.tree_data);
+
+            // Display large files
+            displayLargeFiles(data.large_files);
+
+            // Display file types
+            displayFileTypes(data.file_types);
+        }
+
+        function displaySummaryCards(summary) {
+            const container = document.getElementById('summaryCards');
+            container.innerHTML = `
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center">
+                        <i class="fas fa-folder text-2xl text-blue-600 mr-4"></i>
+                        <div>
+                            <p class="text-sm text-gray-600">Tamanho Total</p>
+                            <p class="text-2xl font-bold text-gray-800">${summary.total_size_human}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center">
+                        <i class="fas fa-file text-2xl text-green-600 mr-4"></i>
+                        <div>
+                            <p class="text-sm text-gray-600">Arquivos</p>
+                            <p class="text-2xl font-bold text-gray-800">${summary.file_count.toLocaleString()}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center">
+                        <i class="fas fa-folder-open text-2xl text-purple-600 mr-4"></i>
+                        <div>
+                            <p class="text-sm text-gray-600">Diretórios</p>
+                            <p class="text-2xl font-bold text-gray-800">${summary.dir_count.toLocaleString()}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center">
+                        <i class="fas fa-search text-2xl text-red-600 mr-4"></i>
+                        <div>
+                            <p class="text-sm text-gray-600">Escaneados</p>
+                            <p class="text-2xl font-bold text-gray-800">${summary.files_scanned.toLocaleString()}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function displayPieChart(pieData) {
+            const data = [{
+                values: pieData.values,
+                labels: pieData.labels,
+                type: 'pie',
+                marker: {
+                    colors: pieData.colors
+                },
+                textinfo: 'label+percent',
+                textposition: 'outside'
+            }];
+
+            const layout = {
+                showlegend: false,
+                margin: { t: 0, b: 0, l: 0, r: 0 }
+            };
+
+            Plotly.newPlot('pieChart', data, layout, {responsive: true});
+        }
+
+        function displayTreemap(treemapData) {
+            const data = [{
+                type: 'treemap',
+                labels: treemapData.labels,
+                values: treemapData.values,
+                parents: treemapData.parents,
+                textinfo: 'label+value',
+                texttemplate: '<b>%{label}</b><br>%{value}',
+                hovertemplate: '<b>%{label}</b><br>Tamanho: %{value}<br><extra></extra>'
+            }];
+
+            const layout = {
+                margin: { t: 0, b: 0, l: 0, r: 0 }
+            };
+
+            Plotly.newPlot('treemapChart', data, layout, {responsive: true});
+        }
+
+        function displayDirectoryTree(treeData) {
+            const container = document.getElementById('directoryTree');
+            
+            function createTreeHTML(nodes, level = 0) {
+                let html = '';
+                for (const node of nodes) {
+                    const indent = '  '.repeat(level);
+                    const icon = node.children.length > 0 ? '📁' : '📄';
+                    html += `
+                        <div class="tree-item py-1 px-2 rounded" style="margin-left: ${level * 20}px">
+                            <span class="font-mono text-sm">
+                                ${icon} <strong>${node.name}</strong> 
+                                <span class="text-blue-600">(${node.size_human})</span>
+                                <span class="text-gray-500">- ${node.file_count} arquivos</span>
+                            </span>
+                        </div>
+                    `;
+                    if (node.children.length > 0) {
+                        html += createTreeHTML(node.children, level + 1);
+                    }
+                }
+                return html;
+            }
+
+            container.innerHTML = createTreeHTML(treeData);
+        }
+
+        function displayLargeFiles(largeFiles) {
+            const container = document.getElementById('largeFilesList');
+            
+            if (largeFiles.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-4">Nenhum arquivo grande encontrado</p>';
+                return;
+            }
+
+            let html = '<div class="space-y-2">';
+            largeFiles.forEach((file, index) => {
+                html += `
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded border">
+                        <div class="flex-1">
+                            <p class="font-medium text-sm truncate" title="${file.path}">${file.name}</p>
+                            <p class="text-xs text-gray-500 truncate">${file.path}</p>
+                        </div>
+                        <div class="text-right ml-4">
+                            <p class="font-bold text-red-600">${file.size_human}</p>
+                            <p class="text-xs text-gray-500">#${index + 1}</p>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+
+            container.innerHTML = html;
+        }
+
+        function displayFileTypes(fileTypes) {
+            const container = document.getElementById('fileTypesTable');
+            
+            if (Object.keys(fileTypes).length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-4">Nenhum tipo de arquivo encontrado</p>';
+                return;
+            }
+
+            // Sort by count
+            const sortedTypes = Object.entries(fileTypes)
+                .sort(([,a], [,b]) => b - a)
+                .slice(0, 15); // Top 15
+
+            const total = Object.values(fileTypes).reduce((a, b) => a + b, 0);
+
+            let html = `
+                <table class="min-w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Extensão</th>
+                            <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Quantidade</th>
+                            <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Percentual</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+            `;
+
+            sortedTypes.forEach(([type, count]) => {
+                const percentage = ((count / total) * 100).toFixed(1);
+                const displayType = type === 'no_extension' ? '(sem extensão)' : type;
+                html += `
+                    <tr>
+                        <td class="px-4 py-2 text-sm font-medium text-gray-900">${displayType}</td>
+                        <td class="px-4 py-2 text-sm text-gray-500 text-right">${count.toLocaleString()}</td>
+                        <td class="px-4 py-2 text-sm text-gray-500 text-right">${percentage}%</td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        function showError(message) {
+            document.getElementById('errorMessage').textContent = message;
+            document.getElementById('errorContainer').style.display = 'block';
+        }
+
+        // Initialize with default analysis
+        window.addEventListener('load', function() {
+            // Optional: Auto-analyze on load
+            // analyzeDirectory();
+        });
+    </script>
+</body>
+</html>
